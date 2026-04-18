@@ -1,32 +1,43 @@
 #!/bin/bash
-# Jebi Hackathon 2026 - Entrypoint
-#
-# Este script lo va a ejecutar Jebi contra un dataset de testeo distinto
-# al de desarrollo. Editen este archivo para que llame a su solucion.
-#
-# Inputs disponibles en ./inputs/:
-#   - shovel_left.mp4
-#   - shovel_right.mp4
-#   - imu_data.csv
-#
-# Outputs deben escribirse en ./outputs/
+# JEBI Hackathon 2026 - Grupo 05
+# Shovel Intelligence: Cycle Detection + Payload Estimation + Dashboard
 
-set -e  # Salir al primer error
+set -e
 
-echo "Jebi Hackathon 2026 - Grupo XX"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+INPUTS="$SCRIPT_DIR/inputs"
+OUTPUTS="$SCRIPT_DIR/outputs"
+
+echo "======================================================"
+echo "  JEBI 2026 - Grupo 05 - Shovel Intelligence"
+echo "======================================================"
 echo "Inputs:"
-ls -la inputs/
+ls "$INPUTS/" 2>/dev/null || echo "  (directorio vacio)"
 
-# TODO: Equipo, reemplacen esta linea con la llamada a su solucion
-# Ejemplos:
-#   python solution/main.py
-#   node solution/index.js
-#   python -m solution.run
+mkdir -p "$OUTPUTS"
 
-echo "ERROR: run.sh no ha sido implementado todavia"
-echo "Editen run.sh para llamar a su solucion"
-exit 1
+# Instalar dependencias
+echo ""
+echo "Instalando dependencias..."
+pip install -q --no-warn-script-location \
+    "opencv-python>=4.8.0" \
+    "numpy>=1.24.0" \
+    "pandas>=2.0.0" \
+    "scipy>=1.11.0" || true
 
+# Intentar instalar easyocr (OCR para numeros de camion)
+# Si falla, el sistema usa clasificacion visual como fallback
+pip install -q easyocr>=1.7.0 2>/dev/null || \
+    echo "  easyocr no disponible - usando fallback visual"
+
+# Correr pipeline principal
+echo ""
+echo "Corriendo pipeline..."
+python "$SCRIPT_DIR/solution/pipeline.py" \
+    --inputs  "$INPUTS" \
+    --outputs "$OUTPUTS"
+
+echo ""
 echo "Outputs generados:"
-ls -la outputs/
+ls -la "$OUTPUTS/"
 echo "Done."
