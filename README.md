@@ -1,6 +1,6 @@
-# Jebi Hackathon 2026 - Grupo XX
+# Jebi Hackathon 2026 - Grupo 05
 
-Repositorio oficial de entrega para el grupo XX del Jebi Hackathon 2026.
+Repositorio oficial de entrega para el grupo 05 del Jebi Hackathon 2026.
 
 ## El reto
 
