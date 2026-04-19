@@ -12,13 +12,9 @@ import re
 import os
 from typing import List, Dict, Optional
 
-# Intenta importar easyocr — si no esta, usa fallback
-try:
-    import easyocr
-    _OCR_READER = None   # lazy init
-    OCR_AVAILABLE = True
-except ImportError:
-    OCR_AVAILABLE = False
+# Lazy OCR support: only import easyocr when needed.
+_OCR_READER = None
+OCR_AVAILABLE = None
 
 # ─── CONFIGURACION ────────────────────────────────────────────────────────────
 
@@ -121,18 +117,17 @@ def detect_truck(frame: np.ndarray) -> Dict:
         return result
 
     # ── Intento 1: OCR ────────────────────────────────────────────────────────
-    if OCR_AVAILABLE:
-        ocr_result = _ocr_truck_number(frame)
-        if ocr_result:
-            result.update({
-                'truck_id':   ocr_result,
-                'confidence': 0.75,
-                'method':     'ocr',
-            })
-            # Asignar modelo/capacidad por rango de ID (heuristica mineria)
-            result['model']      = _infer_model_from_id(ocr_result)
-            result['capacity_t'] = TRUCK_CAPS.get(result['model'], TRUCK_CAPS['unknown'])
-            return result
+    ocr_result = _ocr_truck_number(frame)
+    if ocr_result:
+        result.update({
+            'truck_id':   ocr_result,
+            'confidence': 0.75,
+            'method':     'ocr',
+        })
+        # Asignar modelo/capacidad por rango de ID (heuristica mineria)
+        result['model']      = _infer_model_from_id(ocr_result)
+        result['capacity_t'] = TRUCK_CAPS.get(result['model'], TRUCK_CAPS['unknown'])
+        return result
 
     # ── Intento 2: Clasificacion por silueta ──────────────────────────────────
     model, conf = _classify_truck_visual(frame)
@@ -150,10 +145,15 @@ def detect_truck(frame: np.ndarray) -> Dict:
 
 def _ocr_truck_number(frame: np.ndarray) -> Optional[str]:
     """OCR sobre frame — busca numeros de 2-5 digitos (ID de camion)."""
-    global _OCR_READER
+    global _OCR_READER, OCR_AVAILABLE
+    if OCR_AVAILABLE is False:
+        return None
+
     try:
         if _OCR_READER is None:
+            import easyocr
             _OCR_READER = easyocr.Reader(['en'], verbose=False)
+            OCR_AVAILABLE = True
 
         # ROI: parte inferior del frame (donde aparecen los numeros del camion)
         h, w = frame.shape[:2]
@@ -172,6 +172,7 @@ def _ocr_truck_number(frame: np.ndarray) -> Optional[str]:
             return best[1]
     except Exception as e:
         print(f"  [OCR] Error: {e}")
+        OCR_AVAILABLE = False
     return None
 
 

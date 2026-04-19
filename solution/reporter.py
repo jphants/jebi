@@ -128,6 +128,12 @@ body{{background:{C['bg']};color:{C['text']};font-family:-apple-system,'Segoe UI
 .kpi-val{{font-size:1.6rem;font-weight:700;margin-top:3px}}
 .kpi-sub{{font-size:0.68rem;color:{C['muted']};margin-top:1px}}
 .g{{color:{C['green']}}}.w{{color:{C['yellow']}}}.r{{color:{C['red']}}}.b{{color:{C['blue']}}}
+.gauge-section{{display:flex;flex-wrap:wrap;gap:18px;align-items:flex-start}}
+.gauge-panel{{flex:1 1 560px;display:grid;grid-template-columns:repeat(2,minmax(180px,1fr));gap:12px}}
+.explain-panel{{flex:0 1 320px;background:{C['panel']};border:1px solid {C['border']};border-radius:8px;padding:16px}}
+.explain-title{{font-size:0.85rem;font-weight:700;color:{C['text']};margin-bottom:10px}}
+.explain-item{{font-size:0.82rem;color:{C['muted']};line-height:1.6;margin-bottom:10px}}
+.explain-item strong{{color:{C['text']}}}
 
 /* VIDEO */
 .video-wrap{{display:flex;gap:4px;background:#000;border-radius:8px;overflow:hidden}}
@@ -296,39 +302,53 @@ tr:hover td{{background:rgba(255,255,255,.02)}}
 <!-- GAUGES DE EFICIENCIA -->
 <div class="sec">
   <div class="sec-title">Eficiencias Operacionales en Tiempo Real</div>
-  <div class="gauge-row">
-    <div class="gauge-box">
-      <div class="gauge-title">Recoleccion (Fill)</div>
-      <div id="g-coll" style="height:100px"></div>
+  <div class="gauge-section">
+    <div class="gauge-panel">
+      <div class="gauge-box">
+        <div class="gauge-title">Recoleccion (Fill)</div>
+        <div id="g-coll" style="height:100px"></div>
+      </div>
+      <div class="gauge-box">
+        <div class="gauge-title">Maniobra</div>
+        <div id="g-man" style="height:100px"></div>
+      </div>
+      <div class="gauge-box">
+        <div class="gauge-title">Posicionamiento</div>
+        <div id="g-pos" style="height:100px"></div>
+      </div>
+      <div class="gauge-box">
+        <div class="gauge-title">Descarga</div>
+        <div id="g-disc" style="height:100px"></div>
+      </div>
+      <div class="gauge-box">
+        <div class="gauge-title">OEE Ciclo</div>
+        <div id="g-oee" style="height:100px"></div>
+      </div>
+      <div class="gauge-box">
+        <div class="gauge-title">Tiempo Util</div>
+        <div id="g-teff" style="height:100px"></div>
+      </div>
+      <div class="gauge-box">
+        <div class="gauge-title">Despacho</div>
+        <div id="g-disp" style="height:100px"></div>
+      </div>
+      <div class="gauge-box">
+        <div class="gauge-title">Carga Camion</div>
+        <div id="g-truck" style="height:100px"></div>
+      </div>
     </div>
-    <div class="gauge-box">
-      <div class="gauge-title">Maniobra</div>
-      <div id="g-man" style="height:100px"></div>
+    <div class="explain-panel">
+      <div class="explain-title">¿Qué significa cada indicador?</div>
+      <div class="explain-item"><strong>Recolección:</strong> cómo de lleno quedó el bucket en cada ciclo.</div>
+      <div class="explain-item"><strong>Maniobra:</strong> porcentaje de tiempo activo en el movimiento del ciclo.</div>
+      <div class="explain-item"><strong>Posicionamiento:</strong> velocidad para alcanzar la postura óptima antes del dig.</div>
+      <div class="explain-item"><strong>Descarga:</strong> suavidad y calidad del vuelco del material.</div>
+      <div class="explain-item"><strong>OEE Ciclo:</strong> eficiencia combinada del ciclo completo.</div>
+      <div class="explain-item"><strong>Tiempo Útil:</strong> proporción de la sesión sin esperas largas.</div>
+      <div class="explain-item"><strong>Despacho:</strong> qué tan eficiente es el servicio de camiones respecto a su llenado.</div>
+      <div class="explain-item"><strong>Carga Camión:</strong> cuánto porcentaje de la capacidad del camión se llenó.</div>
     </div>
-    <div class="gauge-box">
-      <div class="gauge-title">Posicionamiento</div>
-      <div id="g-pos" style="height:100px"></div>
-    </div>
-    <div class="gauge-box">
-      <div class="gauge-title">Descarga</div>
-      <div id="g-disc" style="height:100px"></div>
-    </div>
-    <div class="gauge-box">
-      <div class="gauge-title">OEE Ciclo</div>
-      <div id="g-oee" style="height:100px"></div>
-    </div>
-    <div class="gauge-box">
-      <div class="gauge-title">Tiempo Util</div>
-      <div id="g-teff" style="height:100px"></div>
-    </div>
-    <div class="gauge-box">
-      <div class="gauge-title">Despacho</div>
-      <div id="g-disp" style="height:100px"></div>
-    </div>
-    <div class="gauge-box">
-      <div class="gauge-title">Carga Camion</div>
-      <div id="g-truck" style="height:100px"></div>
-    </div>
+  </div>
   </div>
 </div>
 
@@ -431,6 +451,12 @@ let speed    = 1;        // steps per tick
 let alertsShown = new Set();
 let totalAlerts = 0;
 
+// Last known values for HUD
+let lastFillPct = null;
+let lastPayloadT = null;
+let lastVolumeM3 = null;
+let lastCycleId = null;
+
 const vidL = document.getElementById('vid-left');
 const vidR = document.getElementById('vid-right');
 
@@ -441,8 +467,8 @@ function togglePlay() {{
     ? '&#9646;&#9646; PAUSE' : '&#9654; PLAY';
 
   if (playing) {{
-    if (!vidL.paused) vidL.play().catch(()=>{{}});
-    if (!vidR.paused) vidR.play().catch(()=>{{}});
+    if (vidL.paused) vidL.play().catch(()=>{{}});
+    if (vidR.paused) vidR.play().catch(()=>{{}});
     playTimer = setInterval(tick, 100);
   }} else {{
     vidL.pause(); vidR.pause();
@@ -493,13 +519,19 @@ function update(idx) {{
   document.getElementById('vid-left-info').textContent  = 't=' + t.toFixed(1) + 's';
   document.getElementById('vid-right-info').textContent = 't=' + t.toFixed(1) + 's';
 
+  // Update last known values
+  if (snap.fill_pct != null) lastFillPct = snap.fill_pct;
+  if (snap.payload_t != null) lastPayloadT = snap.payload_t;
+  if (snap.volume_m3 != null) lastVolumeM3 = snap.volume_m3;
+  if (snap.cycle_id != null) lastCycleId = snap.cycle_id;
+
   // HUD numbers
   _hud('hud-an',      snap.accel_norm, 'm/s²', 12, 20);
   _hud('hud-gn',      snap.gyro_norm,  'deg/s', 20, 60);
-  _hud('hud-fill',    snap.fill_pct,   '%',     80, 95);
-  _hud('hud-payload', snap.payload_t,  't',     null, null);
-  _hud('hud-vol',     snap.volume_m3,  'm³',    null, null);
-  document.getElementById('hud-cid').textContent = snap.cycle_id ? '#'+snap.cycle_id : '—';
+  _hud('hud-fill',    lastFillPct,     '%',     80, 95);
+  _hud('hud-payload', lastPayloadT || 0, 't',  null, null);
+  _hud('hud-vol',     lastVolumeM3 || 0, 'm³', null, null);
+  document.getElementById('hud-cid').textContent = lastCycleId ? '#'+lastCycleId : '—';
 
   // Phase badge
   const ph   = snap.phase || 'WAIT';
@@ -508,9 +540,9 @@ function update(idx) {{
   pbEl.className    = 'badge phase-' + ph;
   document.getElementById('phase-detail').innerHTML =
     '<b>' + ph.replace('_',' ') + '</b>' +
-    (snap.cycle_id ? '  &mdash; Ciclo #' + snap.cycle_id : '') +
-    '<br><span style="color:{C['muted']}">Fill: ' + (snap.fill_pct!=null?snap.fill_pct.toFixed(1):'—') +
-    '%  |  Payload: ' + (snap.payload_t!=null?snap.payload_t.toFixed(1):'—') + ' t</span>';
+    (lastCycleId ? '  &mdash; Ciclo #' + lastCycleId : '') +
+    '<br><span style="color:{C['muted']}">Fill: ' + (lastFillPct!=null?lastFillPct.toFixed(1):'—') +
+    '%  |  Payload: ' + ((lastPayloadT || 0).toFixed(1)) + ' t</span>';
 
   // Gauges
   const deflt = 50;
@@ -643,6 +675,12 @@ function _addAlert(t, type, sev, msg, val, unit) {{
 }}
 
 // ── INIT ─────────────────────────────────────────────────────────────────────
+// Initialize last values
+lastFillPct = null;
+lastPayloadT = 0;
+lastVolumeM3 = 0;
+lastCycleId = null;
+
 // Inicializar gauges en 50%
 ['g-coll','g-man','g-pos','g-disc','g-oee','g-teff','g-disp','g-truck']
   .forEach((id,i) => _gauge(id, 50, '', '%'));
